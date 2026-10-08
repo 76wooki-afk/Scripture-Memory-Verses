@@ -1,0 +1,207 @@
+/* ============================================================
+ *  디자인(색·글씨·배치) 파일
+ *  색을 바꾸고 싶으면 아래 :root 의 값만 바꾸면 됩니다.
+ * ============================================================ */
+:root {
+  --bg: #f6f3ec;          /* 목록 화면 배경 */
+  --card: #ffffff;        /* 카드 배경 */
+  --ink: #22252b;         /* 기본 글자색 */
+  --muted: #7a7f88;       /* 흐린 글자색 */
+  --accent: #b5862f;      /* 강조색 (금색) */
+  --line: #e4ded0;        /* 구분선 */
+  --stage-bg: radial-gradient(ellipse at 50% 30%, #fbf8f1 0%, #efe8d8 100%);
+  --stage-ink: #1f2430;
+  --stage-dim: rgba(31, 36, 48, 0.28);
+  --bar-bg: rgba(255, 255, 255, 0.92);
+  --verse-size: 30px;     /* 말씀 글자 크기 (앱에서 조절) */
+  --font-verse: "Noto Serif KR", "Nanum Myeongjo", "AppleMyungjo", "Batang", serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+}
+[data-theme="dark"] {
+  --bg: #12161f;
+  --card: #1b2130;
+  --ink: #e9e6df;
+  --muted: #8d93a0;
+  --accent: #e0b65a;
+  --line: #2a3142;
+  --stage-bg: radial-gradient(ellipse at 50% 30%, #1f2a44 0%, #0b0f18 100%);
+  --stage-ink: #f5efe0;
+  --stage-dim: rgba(245, 239, 224, 0.26);
+  --bar-bg: rgba(18, 22, 31, 0.9);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+.hidden { display: none !important; }
+
+/* ---------- ① 목록 화면 ---------- */
+#listScreen {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top) + 20px) 16px calc(env(safe-area-inset-bottom) + 24px);
+}
+.list-header { display: flex; justify-content: space-between; align-items: center; }
+h1 { margin: 0; font-family: var(--font-verse); font-size: 28px; letter-spacing: -0.5px; }
+.subtitle { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.search {
+  width: 100%; margin: 18px 0 8px; padding: 12px 14px;
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card); color: var(--ink); font-size: 16px;
+}
+.lesson-head {
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 22px 4px 8px; font-weight: 700;
+}
+.lesson-no {
+  color: var(--accent); font-size: 13px; letter-spacing: 1px;
+}
+.lesson-topic { font-size: 17px; }
+.verse-card {
+  display: block; width: 100%; text-align: left;
+  margin: 0 0 10px; padding: 14px 16px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  transition: transform .1s;
+}
+.verse-card:active { transform: scale(0.98); }
+.verse-ref { font-weight: 700; font-size: 16px; display: flex; gap: 6px; align-items: center; }
+.badge {
+  font-size: 11px; font-weight: 500; padding: 2px 6px; border-radius: 6px;
+  background: var(--line); color: var(--muted);
+}
+.verse-preview {
+  margin-top: 6px; color: var(--muted); font-size: 14px; line-height: 1.5;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.empty { text-align: center; color: var(--muted); padding: 40px 0; }
+.list-footer { margin-top: 28px; text-align: center; color: var(--muted); font-size: 12px; }
+
+/* ---------- ② 말씀 표시 화면 ---------- */
+#viewScreen {
+  position: fixed; inset: 0;
+  background: var(--stage-bg);
+  color: var(--stage-ink);
+  overflow: hidden;
+  user-select: none; -webkit-user-select: none;
+}
+.stage {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; justify-content: center; align-items: center;
+  padding: calc(env(safe-area-inset-top) + 24px) 24px calc(env(safe-area-inset-bottom) + 24px);
+  overflow-y: auto;
+}
+.lines {
+  width: 100%; max-width: 900px;
+  font-family: var(--font-verse);
+  font-size: var(--verse-size);
+  line-height: 1.6;
+  text-align: center;
+  word-break: keep-all;          /* 한글 단어 중간에서 줄바꿈 방지 */
+  transition: transform .8s cubic-bezier(.22, .61, .36, 1);
+}
+.line {
+  display: block; padding: 0.12em 0;
+  transition: opacity .8s ease, color .8s ease, transform .8s ease, filter .8s ease;
+}
+.ref-label {
+  margin-top: 1.2em;
+  font-family: var(--font-ui);
+  font-size: calc(var(--verse-size) * 0.55);
+  color: var(--accent); font-weight: 700; letter-spacing: 1px;
+  transition: opacity .8s ease;
+}
+
+/* 정지 모드: 전체 표시, 화면 안에서 스크롤 가능 */
+.mode-static .stage, .mode-hint .stage { justify-content: safe center; }
+
+/* 가사 모드: 현재 줄을 화면 가운데에 두고 위아래로 흐름 */
+.mode-lyric .stage { overflow: hidden; }
+.mode-lyric .line { opacity: 0; transform: translateY(12px); }
+.mode-lyric .line.past { opacity: 1; color: var(--stage-dim); transform: none; }
+.mode-lyric .line.current { opacity: 1; transform: scale(1.04); font-weight: 700; }
+.mode-lyric .line.done { opacity: 1; transform: none; color: var(--stage-ink); }
+.mode-lyric .ref-label { opacity: 0; }
+.mode-lyric .ref-label.show { opacity: 1; }
+
+/* 가리기 모드: 첫 글자만 보이기 */
+.hint-hidden { color: transparent; border-bottom: 2px solid var(--stage-dim); }
+.mode-hint .line { cursor: pointer; }
+.mode-hint .line.revealed .hint-hidden { color: inherit; border-color: transparent; }
+
+/* 조작줄 */
+.bar {
+  position: absolute; left: 0; right: 0;
+  background: var(--bar-bg);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  transition: transform .3s ease, opacity .3s ease;
+  z-index: 5;
+}
+.top-bar {
+  top: 0; display: flex; align-items: center; justify-content: space-between;
+  padding: calc(env(safe-area-inset-top) + 8px) 10px 8px;
+}
+.bottom-bar {
+  bottom: 0; padding: 10px 12px calc(env(safe-area-inset-bottom) + 12px);
+  display: flex; flex-direction: column; gap: 10px;
+}
+.controls-hidden .top-bar { transform: translateY(-110%); opacity: 0; pointer-events: none; }
+.controls-hidden .bottom-bar { transform: translateY(110%); opacity: 0; pointer-events: none; }
+.view-title { font-size: 15px; font-weight: 600; text-align: center; flex: 1; }
+.row { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.icon-btn {
+  min-width: 44px; height: 44px; padding: 0 10px;
+  border: none; border-radius: 22px; background: transparent; font-size: 20px;
+}
+.icon-btn:active { background: var(--line); }
+.icon-btn.small-text { font-size: 15px; font-weight: 600; }
+.icon-btn.on { background: var(--accent); color: #fff; }
+.play-btn {
+  width: 60px; height: 60px; border-radius: 50%; border: none;
+  background: var(--accent); color: #fff; font-size: 24px;
+}
+.segmented { display: flex; background: var(--line); border-radius: 12px; padding: 3px; }
+.segmented button {
+  border: none; background: transparent; padding: 8px 18px; border-radius: 9px; font-size: 15px;
+}
+.segmented button.active { background: var(--card); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.speed-row .label { font-size: 14px; color: var(--muted); }
+.speed-row input[type=range] { flex: 1; max-width: 220px; accent-color: var(--accent); }
+.speed-label { min-width: 44px; text-align: center; font-weight: 700; }
+.tap-hint {
+  position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px);
+  transform: translateX(-50%);
+  font-size: 13px; color: var(--stage-dim); white-space: nowrap;
+  transition: opacity .5s;
+}
+.controls-visible .tap-hint { opacity: 0; }
+
+/* ---------- ③ 편집 창 ---------- */
+dialog {
+  width: min(92vw, 520px); border: none; border-radius: 18px; padding: 0;
+  background: var(--card); color: var(--ink);
+}
+dialog::backdrop { background: rgba(0,0,0,.5); }
+.edit-form { padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+.edit-form h2 { margin: 0; font-size: 19px; }
+.edit-form label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 600; }
+.edit-form input, .edit-form textarea {
+  font: inherit; font-weight: 400; font-size: 16px; padding: 10px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink);
+}
+.edit-note { margin: 0; color: var(--muted); font-size: 12px; }
+.edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.edit-actions button { padding: 10px 16px; border-radius: 10px; border: 1px solid var(--line); background: transparent; }
+.edit-actions .primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.edit-actions #resetVerseBtn { margin-right: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  .line, .lines, .ref-label { transition: none !important; }
+}
+.mode-lyric.finished .stage { overflow-y: auto; justify-content: safe center; }
+.tap-hint.gone { opacity: 0; }
