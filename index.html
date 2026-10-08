@@ -4,15 +4,15 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>말씀암송</title>
-  <meta name="description" content="온누리교회 일대일 제자양육 성경암송구절">
-  <meta name="theme-color" content="#1b2a4a">
+  <meta name="description" content="온누리교회 일대일 제자양육 암송성구">
+  <meta name="theme-color" content="#000000">
   <!-- 홈 화면 설치(앱처럼 실행)용 설정 -->
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="말씀암송">
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -21,17 +21,24 @@
   <!-- ① 목록 화면 -->
   <section id="listScreen" class="screen">
     <header class="list-header">
-      <div>
-        <h1>말씀암송</h1>
-        <p class="subtitle">일대일 제자양육 암송구절</p>
-      </div>
-      <button id="themeBtn" class="icon-btn" aria-label="화면 밝기 바꾸기">🌙</button>
+      <h1>말씀암송</h1>
+      <p class="subtitle">온누리교회 일대일 제자양육 암송성구 32구절</p>
     </header>
-    <input id="searchInput" class="search" type="search" placeholder="🔍 성경 이름·주제로 찾기 (예: 요한, 기도)">
+
+    <!-- 암송 진도 -->
+    <div class="progress-box">
+      <div class="progress-text">외운 구절 <b id="progressCount">0</b> / <span id="progressTotal">32</span></div>
+      <div class="progress-bar"><div id="progressFill"></div></div>
+    </div>
+
+    <input id="searchInput" class="search" type="search" inputmode="search"
+           placeholder="🔍 번호·성경 이름·단어로 찾기 (예: 23, 요한)">
+
+    <!-- 단원 바로가기 -->
+    <nav id="jumpNav" class="jump-nav" aria-label="단원 바로가기"></nav>
+
     <main id="verseList"></main>
-    <footer class="list-footer">
-      성경 본문: 개역개정 ⓒ 대한성서공회 · 개인 암송용
-    </footer>
+    <footer class="list-footer">성경 본문: 성경전서 개역한글판</footer>
   </section>
 
   <!-- ② 말씀 표시 화면 (전체 화면) -->
@@ -43,49 +50,80 @@
 
     <!-- 위쪽 조작줄 -->
     <div id="topBar" class="bar top-bar">
-      <button id="closeBtn" class="icon-btn" aria-label="목록으로">✕</button>
+      <button id="closeBtn" class="icon-btn labeled" aria-label="목록으로"><span class="ic">✕</span><span class="cap">목록</span></button>
       <div id="viewTitle" class="view-title"></div>
-      <button id="editBtn" class="icon-btn small-text" aria-label="구절 편집">편집</button>
+      <button id="memBtn" class="icon-btn labeled" aria-label="외웠어요 표시"><span class="ic">☆</span><span class="cap">외웠어요</span></button>
+      <button id="settingsBtn" class="icon-btn labeled" aria-label="설정"><span class="ic">⚙</span><span class="cap">설정</span></button>
     </div>
 
     <!-- 아래쪽 조작줄 -->
     <div id="bottomBar" class="bar bottom-bar">
-      <div class="row">
-        <div class="segmented" role="group" aria-label="표시 방식">
-          <button data-mode="static">정지</button>
-          <button data-mode="lyric">가사</button>
-          <button data-mode="hint">가리기</button>
+      <div class="segmented" role="group" aria-label="보기 방식">
+        <button data-mode="static">정지</button>
+        <button data-mode="lyric">가사</button>
+        <button data-mode="hint">외워보기</button>
+      </div>
+      <div class="speed-row" id="speedRow">
+        <button id="slowerBtn" class="icon-btn small-text" aria-label="느리게">느리게</button>
+        <div class="speed-mid">
+          <input id="speedRange" type="range" min="0" max="6" step="1" aria-label="속도">
+          <span id="speedLabel" class="speed-label"></span>
         </div>
+        <button id="fasterBtn" class="icon-btn small-text" aria-label="빠르게">빠르게</button>
       </div>
-      <div class="row speed-row" id="speedRow">
-        <span class="label">속도</span>
-        <button id="slowerBtn" class="icon-btn" aria-label="느리게">−</button>
-        <input id="speedRange" type="range" min="0" max="6" step="1" aria-label="속도">
-        <button id="fasterBtn" class="icon-btn" aria-label="빠르게">+</button>
-        <span id="speedLabel" class="speed-label">1x</span>
-      </div>
-      <div class="row">
-        <button id="prevBtn" class="icon-btn" aria-label="이전 구절">⏮</button>
-        <button id="restartBtn" class="icon-btn" aria-label="처음부터">↺</button>
-        <button id="playBtn" class="play-btn" aria-label="재생">▶</button>
-        <button id="repeatBtn" class="icon-btn" aria-label="반복 재생">🔁</button>
-        <button id="nextBtn" class="icon-btn" aria-label="다음 구절">⏭</button>
-      </div>
-      <div class="row">
-        <button id="fontDownBtn" class="icon-btn small-text" aria-label="글자 작게">가−</button>
-        <button id="fontUpBtn" class="icon-btn small-text" aria-label="글자 크게">가+</button>
-        <button id="viewThemeBtn" class="icon-btn" aria-label="화면 밝기 바꾸기">🌙</button>
-        <button id="fullBtn" class="icon-btn" aria-label="전체 화면">⛶</button>
+      <div class="row main-row">
+        <button id="prevBtn" class="icon-btn labeled" aria-label="이전 구절"><span class="ic">⏮</span><span class="cap">이전 구절</span></button>
+        <button id="prevLineBtn" class="icon-btn labeled lyric-only" aria-label="이전 줄"><span class="ic">◀</span><span class="cap">이전 줄</span></button>
+        <button id="playBtn" class="play-btn lyric-only" aria-label="재생">▶</button>
+        <button id="nextLineBtn" class="icon-btn labeled lyric-only" aria-label="다음 줄"><span class="ic">▶</span><span class="cap">다음 줄</span></button>
+        <button id="revealBtn" class="icon-btn labeled hint-only" aria-label="정답 모두 보기"><span class="ic">👁</span><span class="cap">정답 보기</span></button>
+        <button id="nextBtn" class="icon-btn labeled" aria-label="다음 구절"><span class="ic">⏭</span><span class="cap">다음 구절</span></button>
       </div>
     </div>
-    <div id="tapHint" class="tap-hint">화면을 터치하면 조작 버튼이 나타납니다</div>
+    <div id="toast" class="toast" role="status"></div>
+    <div id="tapHint" class="tap-hint">화면을 누르면 조작 버튼이 나타납니다</div>
   </section>
 
-  <!-- ③ 구절 편집 창 -->
+  <!-- ③ 설정 창 -->
+  <dialog id="settingsDialog">
+    <form method="dialog" class="sheet">
+      <h2>설정</h2>
+      <div class="set-row">
+        <span>글자 크기</span>
+        <div class="stepper">
+          <button type="button" id="fontDownBtn" aria-label="글자 작게">가−</button>
+          <span id="fontLabel"></span>
+          <button type="button" id="fontUpBtn" aria-label="글자 크게">가+</button>
+        </div>
+      </div>
+      <div class="set-row">
+        <span>끝나면</span>
+        <div class="segmented small" id="repeatSeg">
+          <button type="button" data-repeat="off">멈춤</button>
+          <button type="button" data-repeat="one">반복</button>
+          <button type="button" data-repeat="next">다음 구절</button>
+        </div>
+      </div>
+      <div class="set-row">
+        <span>소리로 듣기<br><small>가사 모드에서 한 줄씩 읽어 줌</small></span>
+        <label class="switch"><input type="checkbox" id="voiceToggle"><span></span></label>
+      </div>
+      <div class="set-row">
+        <span>전체 화면</span>
+        <button type="button" id="fullBtn" class="pill">켜기 / 끄기</button>
+      </div>
+      <div class="set-row">
+        <span>이 구절 고치기<br><small>교재와 다를 때만 사용</small></span>
+        <button type="button" id="editBtn" class="pill">편집</button>
+      </div>
+      <button value="close" class="primary wide">닫기</button>
+    </form>
+  </dialog>
+
+  <!-- ④ 구절 편집 창 -->
   <dialog id="editDialog">
-    <form method="dialog" class="edit-form">
+    <form method="dialog" class="sheet">
       <h2>구절 편집</h2>
-      <label>주제 <input id="editTopic" type="text"></label>
       <label>성경 위치 <input id="editRef" type="text" placeholder="예: 요한복음 3:16"></label>
       <label>본문 <small>(줄 바꿈 위치에 엔터)</small>
         <textarea id="editText" rows="9"></textarea>
