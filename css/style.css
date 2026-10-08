@@ -138,6 +138,11 @@ h1 { margin: 0; font-family: var(--font-verse); font-size: 30px; letter-spacing:
 .mode-lyric.finished .stage { overflow-y: auto; }
 .mode-lyric.finished .ref-line { display: none; }
 
+/* 가로 화면: 정지·외워보기에서는 줄을 이어 붙여 넓은 화면을 활용 */
+.landscape.mode-static .line, .landscape.mode-hint .line { display: inline; }
+.landscape.mode-static .line::after, .landscape.mode-hint .line::after { content: " "; }
+.landscape .lines { max-width: 1100px; }
+
 /* 외워보기 모드: 첫 글자만 보이기 */
 .hint-hidden { color: transparent; border-bottom: 2px solid var(--stage-dim); }
 .mode-hint .line { cursor: pointer; }
@@ -251,4 +256,12 @@ dialog::backdrop { background: rgba(0,0,0,.7); }
 
 @media (prefers-reduced-motion: reduce) {
   .line, .lines, .ref-label { transition: none !important; }
+}
+
+/* 가로 화면 + 낮은 높이(휴대폰): 조작 버튼을 한두 줄로 압축 */
+@media (orientation: landscape) and (max-height: 520px) {
+  .bottom-bar { flex-direction: row; flex-wrap: wrap; justify-content: center; gap: 4px 12px; padding-top: 6px; }
+  .bottom-bar .speed-row { width: auto; flex: 1 1 260px; max-width: 360px; }
+  .bottom-bar .main-row { width: auto; flex: 1 1 360px; max-width: 460px; }
+  .play-btn { width: 52px; height: 52px; font-size: 22px; }
 }

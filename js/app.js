@@ -215,18 +215,26 @@
     fitText(!lyric);
   }
 
-  // 글자 크기 맞추기: fit=true 이면 구절 전체가 한 화면에 들어오도록 글자를 줄임
-  // (단, 너무 작아지지 않게 FIT_MIN 까지만 줄이고 나머지는 위아래로 밀어서 보기)
+  // 글자 크기 맞추기
+  //  fit=false (가사 모드 재생 중): 설정한 글자 크기 그대로
+  //  fit=true  (정지·외워보기·가사 끝난 뒤): 화면에 꽉 차도록 글자를 키우거나 줄임
+  //   - 가장 작게: FIT_MIN(24px) — 이보다 길면 위아래로 밀어서 보기
+  //   - 가장 크게: 화면 짧은 쪽 길이의 14% (설정한 글자 크기가 더 크면 그 값)
   function fitText(fit) {
     const view = $("viewScreen"), stage = $("stage");
-    let size = settings.fontSize;
-    view.style.setProperty("--verse-size", size + "px");
+    const set = (px) => view.style.setProperty("--verse-size", px + "px");
+    view.classList.toggle("landscape", innerWidth > innerHeight);   // 가로 화면 표시
+    set(settings.fontSize);
     if (!fit) return;
     const floor = Math.min(settings.fontSize, FIT_MIN);
-    while (size > floor && stage.scrollHeight > stage.clientHeight) {
-      size -= 1;
-      view.style.setProperty("--verse-size", size + "px");
+    const cap = Math.max(settings.fontSize, Math.round(Math.min(innerWidth, innerHeight) * 0.14));
+    let lo = floor, hi = cap, best = floor;
+    while (lo <= hi) {                       // 맞는 크기 중 가장 큰 값을 반씩 좁혀 찾기
+      const mid = (lo + hi) >> 1;
+      set(mid);
+      if (stage.scrollHeight <= stage.clientHeight) { best = mid; lo = mid + 1; } else { hi = mid - 1; }
     }
+    set(best);
   }
 
   // 외워보기 모드: 각 어절의 첫 글자만 보이고 나머지는 가림
@@ -609,11 +617,15 @@
     else if (e.key === "Escape") closeVerse(false);
   });
 
-  window.addEventListener("resize", () => {
+  // 세로 ↔ 가로 화면 전환 시 글자 크기·위치 다시 맞추기
+  function refit() {
     if ($("viewScreen").classList.contains("hidden")) return;
     fitText(settings.mode !== "lyric" || $("viewScreen").classList.contains("finished"));
     if (settings.mode === "lyric" && state.lineIdx >= 0) centerLine($("lines").children[state.lineIdx]);
-  });
+  }
+  window.addEventListener("resize", refit);
+  // 일부 휴대폰은 회전 직후 화면 크기가 늦게 바뀌므로 한 번 더 맞춤
+  window.addEventListener("orientationchange", () => setTimeout(refit, 350));
 
   // ---------- 시작 ----------
   setSpeed(settings.speedIdx);
