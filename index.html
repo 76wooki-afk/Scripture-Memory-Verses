@@ -52,16 +52,22 @@
     <div id="topBar" class="bar top-bar">
       <button id="closeBtn" class="icon-btn labeled" aria-label="목록으로"><span class="ic">✕</span><span class="cap">목록</span></button>
       <div id="viewTitle" class="view-title"></div>
+      <button id="voiceBtn" class="icon-btn labeled" aria-label="소리로 듣기"><span class="ic">🔈</span><span class="cap">소리</span></button>
       <button id="memBtn" class="icon-btn labeled" aria-label="외웠어요 표시"><span class="ic">☆</span><span class="cap">외웠어요</span></button>
       <button id="settingsBtn" class="icon-btn labeled" aria-label="설정"><span class="ic">⚙</span><span class="cap">설정</span></button>
     </div>
 
     <!-- 아래쪽 조작줄 -->
     <div id="bottomBar" class="bar bottom-bar">
-      <div class="segmented" role="group" aria-label="보기 방식">
+      <div class="segmented" id="modeSeg" role="group" aria-label="보기 방식">
         <button data-mode="static">정지</button>
         <button data-mode="lyric">가사</button>
         <button data-mode="hint">외워보기</button>
+      </div>
+      <div class="segmented small hint-only" id="hintSeg" role="group" aria-label="외워보기 방식">
+        <button data-hint="first">첫 글자만</button>
+        <button data-hint="key">핵심 단어 빈칸</button>
+        <button data-hint="pick">빈칸 고르기</button>
       </div>
       <div class="speed-row" id="speedRow">
         <button id="slowerBtn" class="icon-btn small-text" aria-label="느리게">느리게</button>
@@ -77,9 +83,12 @@
         <button id="playBtn" class="play-btn lyric-only" aria-label="재생">▶</button>
         <button id="nextLineBtn" class="icon-btn labeled lyric-only" aria-label="다음 줄"><span class="ic">▶</span><span class="cap">다음 줄</span></button>
         <button id="revealBtn" class="icon-btn labeled hint-only" aria-label="정답 모두 보기"><span class="ic">👁</span><span class="cap">정답 보기</span></button>
+        <button id="clearBlanksBtn" class="icon-btn labeled pick-only" aria-label="빈칸 모두 지우기"><span class="ic">⌫</span><span class="cap">모두 지우기</span></button>
+        <button id="resetBlanksBtn" class="icon-btn labeled pick-only" aria-label="기본 빈칸으로"><span class="ic">↺</span><span class="cap">기본 빈칸</span></button>
         <button id="nextBtn" class="icon-btn labeled" aria-label="다음 구절"><span class="ic">⏭</span><span class="cap">다음 구절</span></button>
       </div>
     </div>
+    <div id="loopBadge" class="loop-badge" aria-live="polite"></div>
     <div id="toast" class="toast" role="status"></div>
     <div id="tapHint" class="tap-hint">화면을 누르면 조작 버튼이 나타납니다</div>
   </section>
@@ -97,16 +106,26 @@
         </div>
       </div>
       <div class="set-row">
-        <span>끝나면</span>
-        <div class="segmented small" id="repeatSeg">
-          <button type="button" data-repeat="off">멈춤</button>
-          <button type="button" data-repeat="one">반복</button>
-          <button type="button" data-repeat="next">다음 구절</button>
+        <span>소리로 듣기<br><small>가사 모드에서 한 줄씩 읽어 줌</small></span>
+        <label class="switch"><input type="checkbox" id="voiceToggle"><span></span></label>
+      </div>
+      <div class="set-col">
+        <span>반복 횟수 <small>(가사·소리 재생)</small></span>
+        <div class="segmented small" id="loopSeg">
+          <button type="button" data-loops="1">1회</button>
+          <button type="button" data-loops="2">2회</button>
+          <button type="button" data-loops="3">3회</button>
+          <button type="button" data-loops="5">5회</button>
+          <button type="button" data-loops="10">10회</button>
+          <button type="button" data-loops="0">무한 ∞</button>
         </div>
       </div>
       <div class="set-row">
-        <span>소리로 듣기<br><small>가사 모드에서 한 줄씩 읽어 줌</small></span>
-        <label class="switch"><input type="checkbox" id="voiceToggle"><span></span></label>
+        <span>반복이 끝나면</span>
+        <div class="segmented small" id="afterSeg">
+          <button type="button" data-after="stop">멈춤</button>
+          <button type="button" data-after="next">다음 구절</button>
+        </div>
       </div>
       <div class="set-row">
         <span>전체 화면</span>

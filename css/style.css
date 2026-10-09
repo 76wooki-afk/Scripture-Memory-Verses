@@ -135,6 +135,7 @@ h1 { margin: 0; font-family: var(--font-verse); font-size: 30px; letter-spacing:
 .mode-lyric .ref-line.past, .mode-lyric .ref-line.done { color: var(--accent); opacity: .7; }
 .mode-lyric .ref-label { opacity: 0; }
 .mode-lyric .ref-label.show { opacity: 1; }
+.mode-lyric .ref-label:not(.show) { transition: none; }   /* 다시 시작할 때 겹쳐 보이지 않게 바로 숨김 */
 .mode-lyric.finished .stage { overflow-y: auto; }
 .mode-lyric.finished .ref-line { display: none; }
 
@@ -148,10 +149,35 @@ h1 { margin: 0; font-family: var(--font-verse); font-size: 30px; letter-spacing:
 .mode-hint .line { cursor: pointer; }
 .mode-hint .line.revealed .hint-hidden { color: inherit; border-color: transparent; }
 
+/* 외워보기 – 핵심 단어 빈칸 */
+.mode-hint .blank {
+  color: transparent; border-bottom: 2px solid var(--accent);
+  cursor: pointer; transition: color .25s;
+}
+.mode-hint .blank.revealed { color: var(--accent); border-bottom-color: transparent; }
+/* 외워보기 – 빈칸 고르기: 본문을 다 보여주고 빈칸 단어는 금색 점선 */
+.hint-pick .pickable { cursor: pointer; border-radius: 4px; }
+.hint-pick .pickable:active { background: rgba(255, 255, 255, 0.15); }
+.hint-pick .blank {
+  color: var(--accent); background: rgba(224, 182, 90, 0.18);
+  border-bottom: 2px dashed var(--accent); border-radius: 4px;
+}
+
+/* 반복 표시 (예: 🔁 2 / 5) */
+.loop-badge {
+  position: absolute; right: 14px; top: calc(env(safe-area-inset-top) + 12px); z-index: 4;
+  font-size: 14px; font-weight: 700; color: var(--muted);
+  opacity: 0; transition: opacity .3s; pointer-events: none;
+}
+.loop-badge.show { opacity: 1; }
+
 /* 모드별로 보이는 버튼 */
 #viewScreen:not(.mode-lyric) .lyric-only,
 #viewScreen:not(.mode-lyric) #speedRow { display: none; }
 #viewScreen:not(.mode-hint) .hint-only { display: none; }
+#viewScreen:not(.mode-hint) .pick-only,
+#viewScreen.mode-hint:not(.hint-pick) .pick-only,
+#viewScreen.hint-pick #revealBtn { display: none; }
 
 /* 조작줄 */
 .bar {
@@ -227,6 +253,10 @@ dialog::backdrop { background: rgba(0,0,0,.7); }
 .sheet { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
 .sheet h2 { margin: 0; font-size: 20px; }
 .set-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 16px; font-weight: 600; }
+.set-col { display: flex; flex-direction: column; gap: 8px; font-size: 16px; font-weight: 600; }
+.set-col small { font-weight: 400; color: var(--muted); font-size: 13px; }
+.set-col .segmented { flex-wrap: wrap; }
+.set-col .segmented button { flex: 1 1 auto; padding: 0 8px; }
 .set-row small { font-weight: 400; color: var(--muted); font-size: 13px; }
 .stepper { display: flex; align-items: center; gap: 10px; }
 .stepper button, .pill {

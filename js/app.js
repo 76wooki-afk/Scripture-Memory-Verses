@@ -12,6 +12,8 @@
   const STORE_KEY = "smv-settings";
   const EDIT_KEY = "smv-edits-v2";    // 32구절 버전부터 구절 번호(no) 기준으로 저장
   const MEM_KEY = "smv-memorized";
+  const BLANK_KEY = "smv-blanks";     // 직접 고른 빈칸 단어 { 구절번호: ["단어", ...] }
+  const LOOP_NAMES = { 0: "무한", 1: "1회", 2: "2회", 3: "3회", 5: "5회", 10: "10회" };
 
   const $ = (id) => document.getElementById(id);
 
@@ -24,12 +26,19 @@
   }
 
   const settings = Object.assign(
-    { mode: "lyric", speedIdx: 2, fontSize: 30, repeat: "off", voice: false },
+    { mode: "lyric", speedIdx: 2, fontSize: 30, voice: false, loops: 1, after: "stop", hint: "key" },
     load(STORE_KEY, {})
   );
-  if (typeof settings.repeat === "boolean") settings.repeat = settings.repeat ? "one" : "off";
+  // 예전 설정(끝나면: 멈춤/반복/다음 구절)을 새 설정(반복 횟수 + 끝나면)으로 옮김
+  if ("repeat" in settings) {
+    const r = settings.repeat;
+    if (r === true || r === "one") { settings.loops = 0; settings.after = "stop"; }
+    else if (r === "next") { settings.loops = 1; settings.after = "next"; }
+    delete settings.repeat;
+  }
   let edits = load(EDIT_KEY, {});            // { 구절번호: {ref, text} }
   let memorized = load(MEM_KEY, []);         // 외운 구절 번호 목록
+  let customBlanks = load(BLANK_KEY, {});    // 직접 고른 빈칸
 
   const state = {
     index: 0,        // 지금 보고 있는 구절 (배열 순서)
@@ -38,6 +47,7 @@
     timer: null,
     hideTimer: null,
     token: 0,        // 재생 예약이 겹치지 않게 하는 번호표
+    pass: 1,         // 지금 몇 번째 반복인지
   };
 
   // ---------- 구절 데이터 ----------
@@ -186,13 +196,15 @@
       r.textContent = v.ref;
       box.appendChild(r);
     }
-    splitLines(v.text).forEach((text) => {
+    splitLines(v.text).forEach((text, li) => {
       const el = document.createElement("span");
       el.className = "line";
       el.dataset.say = text.replace(/\[\d+\]\s*/g, "");
-      if (settings.mode === "hint") {
+      if (settings.mode === "hint" && settings.hint === "first") {
         el.appendChild(hintNodes(text));
         el.addEventListener("click", (e) => { e.stopPropagation(); el.classList.toggle("revealed"); });
+      } else if (settings.mode === "hint") {
+        el.appendChild(blankNodes(text, blankWords(v), settings.hint === "pick", li));
       } else {
         el.appendChild(verseNodes(text));
       }
@@ -205,10 +217,13 @@
     updateMemBtn();
 
     const view = $("viewScreen");
-    view.classList.remove("mode-static", "mode-lyric", "mode-hint", "finished");
-    view.classList.add("mode-" + settings.mode);
-    document.querySelectorAll("#bottomBar .segmented button").forEach((b) =>
+    view.classList.remove("mode-static", "mode-lyric", "mode-hint", "finished", "hint-first", "hint-key", "hint-pick");
+    view.classList.add("mode-" + settings.mode, "hint-" + settings.hint);
+    document.querySelectorAll("#modeSeg button").forEach((b) =>
       b.classList.toggle("active", b.dataset.mode === settings.mode));
+    document.querySelectorAll("#hintSeg button").forEach((b) =>
+      b.classList.toggle("active", b.dataset.hint === settings.hint));
+    updateLoopBadge();
 
     state.lineIdx = -1;
     updatePlayBtn();
@@ -257,6 +272,99 @@
       }
     });
     return frag;
+  }
+
+  // ---------- 외워보기: 핵심 단어 빈칸 ----------
+  // 이 구절의 빈칸 단어 목록 (직접 고른 것이 있으면 그것, 없으면 verses.js의 기본값)
+  function blankWords(v) {
+    return Array.isArray(customBlanks[v.no]) ? customBlanks[v.no] : (v.blanks || []);
+  }
+  const escapeRe = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // 한 줄에서 빈칸 단어가 나오는 위치 찾기 (긴 단어부터 찾음)
+  function blankRanges(line, words) {
+    if (!words.length) return [];
+    const re = new RegExp(words.slice().sort((a, b) => b.length - a.length).map(escapeRe).join("|"), "g");
+    const out = [];
+    let m;
+    while ((m = re.exec(line))) {
+      if (!m[0]) { re.lastIndex++; continue; }
+      out.push({ s: m.index, e: m.index + m[0].length, word: m[0] });
+    }
+    return out;
+  }
+  // picking=false: 빈칸으로 가려서 보여줌 (빈칸을 누르면 정답)
+  // picking=true : 본문을 다 보여주고, 낱말을 누르면 빈칸으로 지정/해제
+  function blankNodes(text, words, picking, lineNo) {
+    const frag = document.createDocumentFragment();
+    const m = text.match(/^\[(\d+)\]\s*/);
+    if (m) {
+      frag.appendChild(verseNodes(m[0]));
+      text = text.slice(m[0].length);
+    }
+    const ranges = blankRanges(text, words);
+    let pos = 0;
+    text.split(" ").forEach((word, wi) => {
+      if (wi) { frag.appendChild(document.createTextNode(" ")); pos++; }
+      const ws = pos, we = pos + word.length;
+      pos = we;
+      const hits = ranges.filter((r) => r.s < we && r.e > ws);
+      const w = document.createElement("span");
+      w.className = "word";
+      let i = ws;
+      hits.forEach((r) => {
+        const a = Math.max(r.s, ws), b = Math.min(r.e, we);
+        if (a > i) w.appendChild(document.createTextNode(text.slice(i, a)));
+        const bl = document.createElement("span");
+        bl.className = "blank";
+        bl.dataset.group = lineNo + "-" + ranges.indexOf(r);   // 두 낱말에 걸친 빈칸은 함께 열림
+        bl.textContent = text.slice(a, b);
+        w.appendChild(bl);
+        i = b;
+      });
+      if (i < we) w.appendChild(document.createTextNode(text.slice(i, we)));
+      if (picking) {
+        w.classList.add("pickable");
+        w.addEventListener("click", (e) => { e.stopPropagation(); togglePick(word, hits.map((h) => h.word)); });
+      } else {
+        w.querySelectorAll(".blank").forEach((bl) => bl.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const on = !bl.classList.contains("revealed");
+          document.querySelectorAll(`.blank[data-group="${bl.dataset.group}"]`)
+            .forEach((x) => x.classList.toggle("revealed", on));
+        }));
+      }
+      frag.appendChild(w);
+    });
+    return frag;
+  }
+  // 낱말 끝의 조사(은·는·을·를·의 …)와 문장부호를 떼어 핵심 단어만 남김
+  const PARTICLES = ["께서", "에게", "에서", "으로", "은", "는", "을", "를", "의", "와", "과", "에", "로", "도", "이", "가", "요"];
+  function stem(word) {
+    let w = word.replace(/[,.?!·]+$/g, "");
+    for (const p of PARTICLES) {
+      if (w.endsWith(p) && w.length - p.length >= 2) { w = w.slice(0, -p.length); break; }
+    }
+    return w;
+  }
+  function togglePick(word, hitWords) {
+    const v = getVerse(state.index);
+    let list = blankWords(v).slice();
+    if (hitWords.length) {
+      list = list.filter((k) => !hitWords.includes(k));          // 이미 빈칸 → 해제
+      toast("빈칸에서 뺐습니다");
+    } else {
+      const k = stem(word);
+      if (k) { list.push(k); toast(`"${k}" 빈칸으로 지정`); }
+    }
+    customBlanks[v.no] = list;
+    save(BLANK_KEY, customBlanks);
+    renderVerse();
+  }
+  function setBlanks(list) {
+    const v = getVerse(state.index);
+    if (list === null) delete customBlanks[v.no]; else customBlanks[v.no] = list;
+    save(BLANK_KEY, customBlanks);
+    renderVerse();
   }
 
   // ---------- 가사 모드 재생 ----------
@@ -328,20 +436,38 @@
     fitText(true);
   }
 
+  // 한 번 다 읽은 뒤: 반복 횟수가 남았으면 처음부터 다시, 다 끝나면 멈추거나 다음 구절로
   function afterFinish() {
     const my = ++state.token;
-    const wait = (ms, fn) => { state.timer = setTimeout(() => { if (my === state.token) fn(); }, ms); };
-    if (settings.voice) speak(getVerse(state.index).ref);
-    if (settings.repeat === "one") {
-      wait(4000 / speed(), () => { state.lineIdx = -1; resetLyric(); advance(); });
-    } else if (settings.repeat === "next") {
-      wait(4000 / speed(), () => go(1));
+    let done = false;
+    const once = (fn) => () => { if (!done && my === state.token) { done = true; fn(); } };
+    const more = settings.loops === 0 || state.pass < settings.loops;
+    const next = () => {
+      if (more) {
+        state.pass++;
+        updateLoopBadge();
+        toast(`🔁 ${state.pass}번째 ` + (settings.loops ? `(총 ${settings.loops}회)` : "(무한 반복)"));
+        state.lineIdx = -1;
+        resetLyric();
+        advance();
+      } else if (settings.after === "next") {
+        go(1);
+      } else {
+        state.playing = false;
+        state.lineIdx = -1;
+        updatePlayBtn();
+        updateLoopBadge();
+        showControls(true);
+      }
+    };
+    const pauseMs = (more || settings.after === "next") ? 2500 / speed() : 0;
+    // 장절을 한 번 더 읽어 줌 (암송 순서: 장절 → 본문 → 장절)
+    if (settings.voice && speak(getVerse(state.index).ref, once(() => { state.timer = setTimeout(once2, pauseMs); }))) {
+      state.timer = setTimeout(once(next), 8000);                 // 읽기가 끝나지 않을 때 대비
     } else {
-      state.playing = false;
-      state.lineIdx = -1;
-      updatePlayBtn();
-      showControls(true);
+      state.timer = setTimeout(once(next), pauseMs);
     }
+    function once2() { if (my === state.token) next(); }
   }
 
   function resetLyric() {
@@ -358,8 +484,12 @@
     state.playing = true;
     if (state.lineIdx === -1) {
       resetLyric();
+      state.pass = 1;
+      updateLoopBadge();
       const my = ++state.token;
-      state.timer = setTimeout(() => { if (my === state.token) advance(); }, 500);
+      // 소리가 켜져 있으면 바로 시작 (아이폰은 버튼을 누른 순간에만 소리를 낼 수 있음)
+      if (settings.voice) advance();
+      else state.timer = setTimeout(() => { if (my === state.token) advance(); }, 500);
     } else {
       scheduleNext($("lines").children[state.lineIdx]);
     }
@@ -376,6 +506,13 @@
   function stop() {
     pause();
     state.lineIdx = -1;
+  }
+  // 화면 위쪽 작은 반복 표시 (예: 🔁 2 / 5)
+  function updateLoopBadge() {
+    const b = $("loopBadge");
+    const show = settings.mode === "lyric" && settings.loops !== 1;
+    b.classList.toggle("show", show);
+    if (show) b.textContent = `🔁 ${state.pass} / ${settings.loops || "∞"}` + (settings.voice ? "  🔊" : "");
   }
   function updatePlayBtn() {
     $("playBtn").textContent = state.playing ? "❚❚" : "▶";
@@ -427,9 +564,10 @@
   }
   function flashTapHint() {
     const hint = $("tapHint");
-    hint.textContent = settings.mode === "hint"
-      ? "가려진 줄을 누르면 정답이 보입니다"
-      : "화면을 누르면 조작 버튼이 나타납니다";
+    hint.textContent = settings.mode !== "hint" ? "화면을 누르면 조작 버튼이 나타납니다"
+      : settings.hint === "first" ? "가려진 줄을 누르면 정답이 보입니다"
+      : settings.hint === "key" ? "빈칸을 누르면 정답이 보입니다"
+      : "빈칸으로 만들 낱말을 누르세요 (다시 누르면 해제)";
     hint.classList.remove("gone");
     clearTimeout(flashTapHint.t);
     flashTapHint.t = setTimeout(() => hint.classList.add("gone"), 4000);
@@ -471,17 +609,48 @@
       setTimeout(() => centerLine($("lines").children[state.lineIdx]), 50);
     }
   }
-  function setRepeat(mode) {
-    settings.repeat = mode;
+  function setLoops(n) {
+    settings.loops = n;
     save(STORE_KEY, settings);
-    document.querySelectorAll("#repeatSeg button").forEach((b) =>
-      b.classList.toggle("active", b.dataset.repeat === mode));
+    document.querySelectorAll("#loopSeg button").forEach((b) =>
+      b.classList.toggle("active", Number(b.dataset.loops) === n));
+    updateLoopBadge();
+  }
+  function setAfter(a) {
+    settings.after = a;
+    save(STORE_KEY, settings);
+    document.querySelectorAll("#afterSeg button").forEach((b) =>
+      b.classList.toggle("active", b.dataset.after === a));
   }
   function setVoice(on) {
     settings.voice = on;
     save(STORE_KEY, settings);
     $("voiceToggle").checked = on;
+    $("voiceBtn").classList.toggle("on", on);
+    $("voiceBtn").querySelector(".ic").textContent = on ? "🔊" : "🔈";
     if (!on) stopSpeech();
+    updateLoopBadge();
+  }
+  // 위쪽 "소리" 버튼: 켜면 가사 모드로 바꿔 처음부터 읽어 줌
+  function toggleVoiceBtn() {
+    const on = !settings.voice;
+    setVoice(on);
+    if (!on) { toast("🔈 소리를 껐습니다"); return; }
+    if (!("speechSynthesis" in window)) { toast("이 휴대폰은 소리 읽기를 지원하지 않습니다"); setVoice(false); return; }
+    toast(`🔊 소리로 읽어 드립니다 · 반복 ${LOOP_NAMES[settings.loops]}`);
+    if (settings.mode !== "lyric") { setMode("lyric"); return; }
+    stop();
+    renderVerse();
+    play();
+  }
+  function setHint(h) {
+    settings.hint = h;
+    save(STORE_KEY, settings);
+    renderVerse();
+    flashTapHint();
+    if (h === "key" && !$("lines").querySelector(".blank")) {
+      toast("빈칸 단어가 없습니다. '빈칸 고르기'에서 정해 주세요");
+    }
   }
   function go(delta) {
     const n = DEFAULT_VERSES.length;
@@ -559,8 +728,13 @@
   $("editBtn").onclick = openEdit;
   $("saveVerseBtn").onclick = saveEdit;
   $("resetVerseBtn").onclick = resetEdit;
-  document.querySelectorAll("#bottomBar .segmented button").forEach((b) => b.onclick = () => setMode(b.dataset.mode));
-  document.querySelectorAll("#repeatSeg button").forEach((b) => b.onclick = () => setRepeat(b.dataset.repeat));
+  document.querySelectorAll("#modeSeg button").forEach((b) => b.onclick = () => setMode(b.dataset.mode));
+  document.querySelectorAll("#hintSeg button").forEach((b) => b.onclick = () => setHint(b.dataset.hint));
+  document.querySelectorAll("#loopSeg button").forEach((b) => b.onclick = () => setLoops(Number(b.dataset.loops)));
+  document.querySelectorAll("#afterSeg button").forEach((b) => b.onclick = () => setAfter(b.dataset.after));
+  $("voiceBtn").onclick = toggleVoiceBtn;
+  $("clearBlanksBtn").onclick = () => { setBlanks([]); toast("빈칸을 모두 지웠습니다"); };
+  $("resetBlanksBtn").onclick = () => { setBlanks(null); toast("기본 빈칸으로 되돌렸습니다"); };
   $("voiceToggle").addEventListener("change", (e) => setVoice(e.target.checked));
   $("speedRange").addEventListener("input", (e) => changeSpeed(Number(e.target.value)));
   $("slowerBtn").onclick = () => changeSpeed(settings.speedIdx - 1);
@@ -569,6 +743,12 @@
   $("prevLineBtn").onclick = () => stepLine(-1);
   $("nextLineBtn").onclick = () => stepLine(1);
   $("revealBtn").onclick = () => {
+    const blanks = Array.from($("lines").querySelectorAll(".blank"));
+    if (settings.hint === "key") {
+      const all = blanks.every((b) => b.classList.contains("revealed"));
+      blanks.forEach((b) => b.classList.toggle("revealed", !all));
+      return;
+    }
     const els = Array.from($("lines").children);
     const all = els.every((el) => el.classList.contains("revealed"));
     els.forEach((el) => el.classList.toggle("revealed", !all));
@@ -630,7 +810,8 @@
   // ---------- 시작 ----------
   setSpeed(settings.speedIdx);
   setFont(settings.fontSize);
-  setRepeat(settings.repeat);
+  setLoops(settings.loops);
+  setAfter(settings.after);
   setVoice(settings.voice);
   renderJumpNav();
   renderList("");
