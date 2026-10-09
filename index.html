@@ -22,7 +22,7 @@
   <section id="listScreen" class="screen">
     <header class="list-header">
       <h1>말씀암송</h1>
-      <p class="subtitle">온누리교회 일대일 제자양육 암송성구 32구절</p>
+      <p class="subtitle">온누리교회 일대일 제자양육 암송성구 32구절 · 기타 암송</p>
     </header>
 
     <!-- 암송 진도 -->
@@ -38,7 +38,7 @@
     <nav id="jumpNav" class="jump-nav" aria-label="단원 바로가기"></nav>
 
     <main id="verseList"></main>
-    <footer class="list-footer">성경 본문: 성경전서 개역한글판</footer>
+    <footer class="list-footer">성경 본문: Ⅰ~Ⅳ 성경전서 개역한글판 · Ⅴ 개역개정</footer>
   </section>
 
   <!-- ② 말씀 표시 화면 (전체 화면) -->
@@ -149,6 +149,13 @@
       <div class="set-row">
         <span>다음 구절 자동 넘어가기<br><small id="autoNextInfo">위 횟수만큼 반복한 뒤 다음 구절로</small></span>
         <label class="switch"><input type="checkbox" id="autoNextToggle"><span></span></label>
+      </div>
+      <div class="set-row">
+        <span>넘어가는 범위</span>
+        <div class="segmented small" id="scopeSeg">
+          <button type="button" data-scope="all">전체 구절</button>
+          <button type="button" data-scope="section">같은 단원 안</button>
+        </div>
       </div>
 
       <h3 class="set-head">기타</h3>

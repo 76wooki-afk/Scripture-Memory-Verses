@@ -10,7 +10,7 @@
   const FONT_MIN = 18, FONT_MAX = 64;
   const FIT_MIN = 24;                 // 정지 모드에서 자동으로 줄일 때의 최소 글자 크기
   const STORE_KEY = "smv-settings";
-  const EDIT_KEY = "smv-edits-v2";    // 32구절 버전부터 구절 번호(no) 기준으로 저장
+  const EDIT_KEY = "smv-edits-v2";    // 구절 번호(no) 기준으로 저장
   const MEM_KEY = "smv-memorized";
   const BLANK_KEY = "smv-blanks";     // 직접 고른 빈칸 단어 { 구절번호: ["단어", ...] }
   const LOOP_NAMES = { 0: "무한", 1: "1회", 2: "2회", 3: "3회", 5: "5회", 10: "10회" };
@@ -27,7 +27,7 @@
 
   const settings = Object.assign(
     { mode: "lyric", speedIdx: 2, fontSize: 30, voice: false, loops: 1, after: "stop", hint: "key",
-      gender: "female", style: "calm", voiceName: "" },
+      gender: "female", style: "calm", voiceName: "", scope: "all" },
     load(STORE_KEY, {})
   );
   // 예전 설정(끝나면: 멈춤/반복/다음 구절)을 새 설정(반복 횟수 + 끝나면)으로 옮김
@@ -144,7 +144,7 @@
         `<span class="no"></span><span class="body"><span class="verse-ref"></span>` +
         `<span class="verse-preview"></span></span><span class="mem-mark" aria-hidden="true"></span>`;
       card.querySelector(".no").textContent = v.no;
-      card.querySelector(".verse-ref").textContent = v.ref + (edits[v.no] ? "  (수정함)" : "");
+      card.querySelector(".verse-ref").textContent = v.ref + (v.title ? " · " + v.title : "") + (edits[v.no] ? "  (수정함)" : "");
       card.querySelector(".verse-preview").textContent = plain(v.text);
       card.querySelector(".mem-mark").textContent = isMem(v.no) ? "★" : "";
       card.setAttribute("aria-label", `${v.no}번 ${v.ref}${isMem(v.no) ? ", 외움" : ""}`);
@@ -213,9 +213,9 @@
       box.appendChild(el);
     });
 
-    $("refLabel").textContent = v.ref;
+    $("refLabel").textContent = v.ref + (v.bible ? ` (${v.bible})` : "");
     $("refLabel").classList.remove("show");
-    $("viewTitle").textContent = `${v.no}. ${v.lesson || v.section.replace(/^[^.]+\.\s*/, "")}`;
+    $("viewTitle").textContent = `${v.no}. ${v.title || v.lesson || v.section.replace(/^[^.]+\.\s*/, "")}`;
     updateMemBtn();
 
     const view = $("viewScreen");
@@ -453,7 +453,7 @@
         resetLyric();
         advance();
       } else if (settings.after === "next") {
-        go(1);
+        goAuto();
       } else {
         state.playing = false;
         state.lineIdx = -1;
@@ -688,7 +688,7 @@
     save(STORE_KEY, settings);
     document.querySelectorAll("#loopSeg button").forEach((b) =>
       b.classList.toggle("active", Number(b.dataset.loops) === n));
-    if (settings.after === "next") $("autoNextInfo").textContent = `각 구절을 ${LOOP_NAMES[n]} 읽고 다음 구절로 (32번 다음은 1번)`;
+    if (settings.after === "next") $("autoNextInfo").textContent = autoNextText(n);
     updateLoopBadge();
   }
   // 다음 구절 자동 넘어가기 (켜면 "무한"은 고를 수 없음 — 넘어갈 수 없으므로)
@@ -700,7 +700,7 @@
     $("autoNextToggle").checked = auto;
     $("loopSeg").querySelector('[data-loops="0"]').disabled = auto;
     $("autoNextInfo").textContent = auto
-      ? `각 구절을 ${LOOP_NAMES[settings.loops]} 읽고 다음 구절로 (32번 다음은 1번)`
+      ? autoNextText(settings.loops)
       : "위 횟수만큼 반복한 뒤 다음 구절로";
     updateLoopBadge();
   }
@@ -778,6 +778,25 @@
     renderVerse();
     if (settings.mode === "lyric") play();
   }
+  // 자동 넘어가기: "같은 단원 안에서"이면 단원의 마지막 다음에 단원의 처음으로 돌아감
+  function goAuto() {
+    if (settings.scope !== "section") { go(1); return; }
+    const sec = DEFAULT_VERSES[state.index].section;
+    const same = DEFAULT_VERSES.map((v, i) => (v.section === sec ? i : -1)).filter((i) => i >= 0);
+    state.index = same[(same.indexOf(state.index) + 1) % same.length];
+    renderVerse();
+    play();
+  }
+  function setScope(sc) {
+    settings.scope = sc;
+    save(STORE_KEY, settings);
+    document.querySelectorAll("#scopeSeg button").forEach((b) => b.classList.toggle("active", b.dataset.scope === sc));
+    setAfter(settings.after);   // 안내 문구 새로 고침
+  }
+  function autoNextText(loops) {
+    const where = settings.scope === "section" ? "같은 단원의 다음 구절로 (단원 끝 → 단원 처음)" : "다음 구절로 (마지막 → 처음)";
+    return `각 구절을 ${LOOP_NAMES[loops]} 읽고 ${where}`;
+  }
 
   // ---------- 외웠어요 ----------
   function toggleMemorized() {
@@ -851,6 +870,7 @@
   document.querySelectorAll("#modeSeg button").forEach((b) => b.onclick = () => setMode(b.dataset.mode));
   document.querySelectorAll("#hintSeg button").forEach((b) => b.onclick = () => setHint(b.dataset.hint));
   document.querySelectorAll("#loopSeg button").forEach((b) => b.onclick = () => setLoops(Number(b.dataset.loops)));
+  document.querySelectorAll("#scopeSeg button").forEach((b) => b.onclick = () => setScope(b.dataset.scope));
   $("autoNextToggle").addEventListener("change", (e) => {
     setAfter(e.target.checked ? "next" : "stop");
     toast(e.target.checked ? `▶ 각 구절 ${LOOP_NAMES[settings.loops]} 후 다음 구절로 넘어갑니다` : "자동 넘어가기를 껐습니다");
@@ -948,7 +968,7 @@
   setSpeed(settings.speedIdx);
   setFont(settings.fontSize);
   setLoops(settings.loops);
-  setAfter(settings.after);
+  setScope(settings.scope);
   setGender(settings.gender, true);
   setStyle(settings.style);
   setVoice(settings.voice);

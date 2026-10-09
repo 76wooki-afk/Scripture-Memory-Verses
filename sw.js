@@ -3,7 +3,7 @@
  * 구절이나 디자인을 고친 뒤에는 아래 VERSION 숫자를 올려 주세요.
  * (그래야 휴대폰이 새 파일을 다시 받아옵니다)
  */
-const VERSION = "v5";
+const VERSION = "v6";
 const CACHE = "smv-" + VERSION;
 const FILES = [
   "./",

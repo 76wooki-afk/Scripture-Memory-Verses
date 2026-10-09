@@ -170,6 +170,7 @@ h1 { margin: 0; font-family: var(--font-verse); font-size: 30px; letter-spacing:
   opacity: 0; transition: opacity .3s; pointer-events: none;
 }
 .loop-badge.show { opacity: 1; }
+.controls-visible .loop-badge { opacity: 0; }   /* 조작 버튼이 보일 때는 겹치지 않게 숨김 */
 
 /* 모드별로 보이는 버튼 */
 #viewScreen:not(.mode-lyric) .lyric-only,
