@@ -105,12 +105,38 @@
           <button type="button" id="fontUpBtn" aria-label="글자 크게">가+</button>
         </div>
       </div>
+      <h3 class="set-head">🔊 소리</h3>
       <div class="set-row">
         <span>소리로 듣기<br><small>가사 모드에서 한 줄씩 읽어 줌</small></span>
         <label class="switch"><input type="checkbox" id="voiceToggle"><span></span></label>
       </div>
+      <div class="set-row">
+        <span>목소리</span>
+        <div class="segmented small" id="genderSeg">
+          <button type="button" data-gender="female">여성</button>
+          <button type="button" data-gender="male">남성</button>
+        </div>
+      </div>
       <div class="set-col">
-        <span>반복 횟수 <small>(가사·소리 재생)</small></span>
+        <span>느낌</span>
+        <div class="segmented small" id="styleSeg">
+          <button type="button" data-style="calm">차분한</button>
+          <button type="button" data-style="bright">경쾌한</button>
+          <button type="button" data-style="holy">거룩한</button>
+          <button type="button" data-style="child">어린이</button>
+        </div>
+      </div>
+      <div class="set-col">
+        <span>휴대폰 음성 <small id="voiceInfo"></small></span>
+        <div class="voice-pick">
+          <select id="voiceSelect" aria-label="휴대폰 음성 선택"></select>
+          <button type="button" id="previewBtn" class="pill">▶ 미리 듣기</button>
+        </div>
+      </div>
+
+      <h3 class="set-head">🔁 반복 · 넘어가기</h3>
+      <div class="set-col">
+        <span>구절마다 반복 횟수</span>
         <div class="segmented small" id="loopSeg">
           <button type="button" data-loops="1">1회</button>
           <button type="button" data-loops="2">2회</button>
@@ -121,12 +147,11 @@
         </div>
       </div>
       <div class="set-row">
-        <span>반복이 끝나면</span>
-        <div class="segmented small" id="afterSeg">
-          <button type="button" data-after="stop">멈춤</button>
-          <button type="button" data-after="next">다음 구절</button>
-        </div>
+        <span>다음 구절 자동 넘어가기<br><small id="autoNextInfo">위 횟수만큼 반복한 뒤 다음 구절로</small></span>
+        <label class="switch"><input type="checkbox" id="autoNextToggle"><span></span></label>
       </div>
+
+      <h3 class="set-head">기타</h3>
       <div class="set-row">
         <span>전체 화면</span>
         <button type="button" id="fullBtn" class="pill">켜기 / 끄기</button>

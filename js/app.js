@@ -26,7 +26,8 @@
   }
 
   const settings = Object.assign(
-    { mode: "lyric", speedIdx: 2, fontSize: 30, voice: false, loops: 1, after: "stop", hint: "key" },
+    { mode: "lyric", speedIdx: 2, fontSize: 30, voice: false, loops: 1, after: "stop", hint: "key",
+      gender: "female", style: "calm", voiceName: "" },
     load(STORE_KEY, {})
   );
   // 예전 설정(끝나면: 멈춤/반복/다음 구절)을 새 설정(반복 횟수 + 끝나면)으로 옮김
@@ -194,6 +195,7 @@
       const r = document.createElement("span");
       r.className = "line ref-line";
       r.textContent = v.ref;
+      r.dataset.say = sayRef(v.ref);
       box.appendChild(r);
     }
     splitLines(v.text).forEach((text, li) => {
@@ -462,7 +464,7 @@
     };
     const pauseMs = (more || settings.after === "next") ? 2500 / speed() : 0;
     // 장절을 한 번 더 읽어 줌 (암송 순서: 장절 → 본문 → 장절)
-    if (settings.voice && speak(getVerse(state.index).ref, once(() => { state.timer = setTimeout(once2, pauseMs); }))) {
+    if (settings.voice && speak(sayRef(getVerse(state.index).ref), once(() => { state.timer = setTimeout(once2, pauseMs); }))) {
       state.timer = setTimeout(once(next), 8000);                 // 읽기가 끝나지 않을 때 대비
     } else {
       state.timer = setTimeout(once(next), pauseMs);
@@ -510,9 +512,10 @@
   // 화면 위쪽 작은 반복 표시 (예: 🔁 2 / 5)
   function updateLoopBadge() {
     const b = $("loopBadge");
-    const show = settings.mode === "lyric" && settings.loops !== 1;
+    const next = settings.after === "next";
+    const show = settings.mode === "lyric" && (settings.loops !== 1 || next);
     b.classList.toggle("show", show);
-    if (show) b.textContent = `🔁 ${state.pass} / ${settings.loops || "∞"}` + (settings.voice ? "  🔊" : "");
+    if (show) b.textContent = `🔁 ${state.pass} / ${settings.loops || "∞"}` + (next ? " → 다음" : "") + (settings.voice ? "  🔊" : "");
   }
   function updatePlayBtn() {
     $("playBtn").textContent = state.playing ? "❚❚" : "▶";
@@ -533,13 +536,83 @@
   }
 
   // ---------- 소리로 듣기 (휴대폰 내장 음성) ----------
+
+  // 숫자를 한자어 수사로 읽기: 2 → "이", 20 → "이십", 150 → "백오십"
+  // ("2장"을 "두 장"으로 읽는 휴대폰이 있어 글자로 바꿔서 읽힘)
+  function sino(n) {
+    const d = ["", "일", "이", "삼", "사", "오", "육", "칠", "팔", "구"];
+    n = Number(n);
+    if (!n) return "영";
+    let out = "";
+    const h = Math.floor(n / 100), t = Math.floor((n % 100) / 10), o = n % 10;
+    if (h) out += (h > 1 ? d[h] : "") + "백";
+    if (t) out += (t > 1 ? d[t] : "") + "십";
+    if (o) out += d[o];
+    return out;
+  }
+  // 성경 위치를 읽는 말로 바꾸기
+  //   "갈라디아서 2:20"   → "갈라디아서 이장 이십절"
+  //   "이사야 53:5-6"     → "이사야 오십삼장 오절에서 육절"
+  //   "시편 1:2-3"        → "시편 일편 이절에서 삼절"   (시편만 "편")
+  function sayRef(ref) {
+    const m = ref.trim().match(/^(.+?)\s*(\d+):(\d+)(?:\s*[-~]\s*(?:(\d+):)?(\d+))?$/);
+    if (!m) return ref;
+    const [, book, ch, v1, ch2, v2] = m;
+    const unit = /^시편/.test(book) ? "편" : "장";
+    let out = `${book} ${sino(ch)}${unit} ${sino(v1)}절`;
+    if (v2) out += "에서 " + (ch2 && ch2 !== ch ? `${sino(ch2)}${unit} ` : "") + `${sino(v2)}절`;
+    return out;
+  }
+
+  // 느낌별 말하기 속도·목소리 높이 (1 = 보통)
+  const VOICE_STYLES = {
+    calm:   { rate: 0.88, pitch: 0.95 },   // 차분한
+    bright: { rate: 1.12, pitch: 1.2 },    // 경쾌한
+    holy:   { rate: 0.76, pitch: 0.82 },   // 거룩한 (느리고 낮게)
+    child:  { rate: 1.0,  pitch: 1.65 },   // 어린이 (높게)
+  };
+  const STYLE_NAMES = { calm: "차분한", bright: "경쾌한", holy: "거룩한", child: "어린이" };
+  // 휴대폰 음성 이름으로 남성/여성 짐작 (모르면 null)
+  const FEMALE_RE = /female|여성|여자|yuna|sora|heami|sunhi|jimin|seohyeon|soonbok|yujin|seoyeon|nara|google|-ism-|-kob-/i;
+  const MALE_RE = /\bmale|남성|남자|minsu|injoon|hyunsu|bongjin|gookmin|jinho|jian|-koc-|-kod-/i;
+  function voiceGender(v) {
+    if (FEMALE_RE.test(v.name)) return "female";
+    if (MALE_RE.test(v.name)) return "male";
+    return null;
+  }
+  const koVoices = () => ("speechSynthesis" in window ? speechSynthesis.getVoices() : [])
+    .filter((v) => v.lang && v.lang.replace("_", "-").toLowerCase().startsWith("ko"));
+  // 설정에 맞는 목소리 고르기 → { voice, real: 실제로 원하는 성별의 목소리인지 }
+  function pickVoice() {
+    const list = koVoices();
+    if (settings.voiceName) {
+      const v = list.find((x) => x.name === settings.voiceName);
+      if (v) return { voice: v, real: voiceGender(v) === settings.gender };
+    }
+    const same = list.filter((v) => voiceGender(v) === settings.gender);
+    const best = same.find((v) => v.localService) || same[0];
+    if (best) return { voice: best, real: true };
+    return { voice: list[0] || null, real: false };
+  }
+  function voiceParams() {
+    const st = VOICE_STYLES[settings.style] || VOICE_STYLES.calm;
+    const { voice, real } = pickVoice();
+    let pitch = st.pitch;
+    // 남성 목소리가 휴대폰에 없으면 여성 목소리를 낮게 바꿔서 대신함 (그 반대도 마찬가지)
+    if (!real && settings.gender === "male") pitch *= 0.72;
+    if (!real && settings.gender === "female" && voice && voiceGender(voice) === "male") pitch *= 1.3;
+    const rate = (0.55 + 0.45 * speed()) * st.rate;
+    return { voice, pitch: Math.min(2, Math.max(0.1, pitch)), rate: Math.min(2, Math.max(0.4, rate)), real };
+  }
+
   function speak(text, onEnd) {
     if (!("speechSynthesis" in window) || !text) return false;
     const u = new SpeechSynthesisUtterance(text);
     u.lang = "ko-KR";
-    u.rate = Math.min(1.6, Math.max(0.6, 0.55 + 0.45 * speed()));
-    const ko = speechSynthesis.getVoices().find((v) => v.lang && v.lang.startsWith("ko"));
-    if (ko) u.voice = ko;
+    const p = voiceParams();
+    u.rate = p.rate;
+    u.pitch = p.pitch;
+    if (p.voice) u.voice = p.voice;
     if (onEnd) u.onend = onEnd;
     speechSynthesis.cancel();
     speechSynthesis.speak(u);
@@ -610,17 +683,64 @@
     }
   }
   function setLoops(n) {
+    if (n === 0 && settings.after === "next") { toast("자동 넘어가기를 켜면 무한 반복은 쓸 수 없습니다"); return; }
     settings.loops = n;
     save(STORE_KEY, settings);
     document.querySelectorAll("#loopSeg button").forEach((b) =>
       b.classList.toggle("active", Number(b.dataset.loops) === n));
+    if (settings.after === "next") $("autoNextInfo").textContent = `각 구절을 ${LOOP_NAMES[n]} 읽고 다음 구절로 (32번 다음은 1번)`;
     updateLoopBadge();
   }
+  // 다음 구절 자동 넘어가기 (켜면 "무한"은 고를 수 없음 — 넘어갈 수 없으므로)
   function setAfter(a) {
     settings.after = a;
+    const auto = a === "next";
+    if (auto && settings.loops === 0) setLoops(1);
     save(STORE_KEY, settings);
-    document.querySelectorAll("#afterSeg button").forEach((b) =>
-      b.classList.toggle("active", b.dataset.after === a));
+    $("autoNextToggle").checked = auto;
+    $("loopSeg").querySelector('[data-loops="0"]').disabled = auto;
+    $("autoNextInfo").textContent = auto
+      ? `각 구절을 ${LOOP_NAMES[settings.loops]} 읽고 다음 구절로 (32번 다음은 1번)`
+      : "위 횟수만큼 반복한 뒤 다음 구절로";
+    updateLoopBadge();
+  }
+  function setGender(g, keepVoice) {
+    settings.gender = g;
+    if (!keepVoice) settings.voiceName = "";   // 성별을 바꾸면 휴대폰 음성은 자동으로 다시 고름
+    save(STORE_KEY, settings);
+    document.querySelectorAll("#genderSeg button").forEach((b) => b.classList.toggle("active", b.dataset.gender === g));
+    fillVoiceSelect();
+  }
+  function setStyle(st) {
+    settings.style = st;
+    save(STORE_KEY, settings);
+    document.querySelectorAll("#styleSeg button").forEach((b) => b.classList.toggle("active", b.dataset.style === st));
+  }
+  // 휴대폰에 있는 한국어 음성 목록 채우기
+  function fillVoiceSelect() {
+    const sel = $("voiceSelect");
+    const list = koVoices();
+    const label = (v) => v.name + ({ female: " · 여성", male: " · 남성" }[voiceGender(v)] || "");
+    sel.innerHTML = "";
+    const auto = document.createElement("option");
+    auto.value = "";
+    auto.textContent = "자동 (목소리·느낌에 맞춤)";
+    sel.appendChild(auto);
+    list.forEach((v) => {
+      const o = document.createElement("option");
+      o.value = v.name;
+      o.textContent = label(v);
+      sel.appendChild(o);
+    });
+    sel.value = list.some((v) => v.name === settings.voiceName) ? settings.voiceName : "";
+    const p = list.length ? voiceParams() : null;
+    $("voiceInfo").textContent = !list.length ? "(한국어 음성을 찾는 중…)"
+      : `(이 휴대폰 한국어 음성 ${list.length}개` + (p && !p.real ? ` · ${settings.gender === "male" ? "남성" : "여성"} 음성이 없어 높낮이로 대신함` : "") + ")";
+  }
+  function preview() {
+    if (!("speechSynthesis" in window)) { toast("이 휴대폰은 소리 읽기를 지원하지 않습니다"); return; }
+    speak(`${sayRef("갈라디아서 2:20")}. 내가 그리스도와 함께 십자가에 못 박혔나니`);
+    toast(`▶ ${settings.gender === "male" ? "남성" : "여성"} · ${STYLE_NAMES[settings.style]}`);
   }
   function setVoice(on) {
     settings.voice = on;
@@ -731,7 +851,24 @@
   document.querySelectorAll("#modeSeg button").forEach((b) => b.onclick = () => setMode(b.dataset.mode));
   document.querySelectorAll("#hintSeg button").forEach((b) => b.onclick = () => setHint(b.dataset.hint));
   document.querySelectorAll("#loopSeg button").forEach((b) => b.onclick = () => setLoops(Number(b.dataset.loops)));
-  document.querySelectorAll("#afterSeg button").forEach((b) => b.onclick = () => setAfter(b.dataset.after));
+  $("autoNextToggle").addEventListener("change", (e) => {
+    setAfter(e.target.checked ? "next" : "stop");
+    toast(e.target.checked ? `▶ 각 구절 ${LOOP_NAMES[settings.loops]} 후 다음 구절로 넘어갑니다` : "자동 넘어가기를 껐습니다");
+  });
+  document.querySelectorAll("#genderSeg button").forEach((b) => b.onclick = () => setGender(b.dataset.gender));
+  document.querySelectorAll("#styleSeg button").forEach((b) => b.onclick = () => setStyle(b.dataset.style));
+  $("voiceSelect").addEventListener("change", (e) => {
+    settings.voiceName = e.target.value;
+    save(STORE_KEY, settings);
+    fillVoiceSelect();
+  });
+  $("previewBtn").onclick = preview;
+  // 음성 목록은 늦게 준비되는 휴대폰이 있음 → 준비되면 다시 채움 (오래된 기기에서도 앱이 멈추지 않게)
+  if ("speechSynthesis" in window) {
+    try { speechSynthesis.addEventListener("voiceschanged", fillVoiceSelect); }
+    catch (e) { speechSynthesis.onvoiceschanged = fillVoiceSelect; }
+    setTimeout(fillVoiceSelect, 1500);
+  }
   $("voiceBtn").onclick = toggleVoiceBtn;
   $("clearBlanksBtn").onclick = () => { setBlanks([]); toast("빈칸을 모두 지웠습니다"); };
   $("resetBlanksBtn").onclick = () => { setBlanks(null); toast("기본 빈칸으로 되돌렸습니다"); };
@@ -812,6 +949,8 @@
   setFont(settings.fontSize);
   setLoops(settings.loops);
   setAfter(settings.after);
+  setGender(settings.gender, true);
+  setStyle(settings.style);
   setVoice(settings.voice);
   renderJumpNav();
   renderList("");
